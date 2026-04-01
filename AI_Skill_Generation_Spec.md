@@ -294,3 +294,48 @@ Verifier 不只驗證結構，還必須驗證 ownership。
 
 ---
 *增補日期：2026-03-11 (V5.2 - Ownership First Addendum)*
+
+---
+
+# V5.3 增補：Legacy Migration & Orchestration Addendum
+
+以下內容為 V5.3 的增補規格，旨在規範 AI 在面對高度完成、具有複雜商業邏輯的舊有專案 (Legacy Project) 進行 UI-kit 遷移時的決策流程與行為合規性。引入 `orchestrate-legacy-migration` 與 `migrate-legacy-to-uikit` 兩套核心技能，以確保遷移過程的安全可控與業務邏輯的完整保留。
+
+---
+
+## 14. 遷移決策模型 (Migration Decision Model)
+
+針對現有功能的改造與遷移，必須遵循 **絞殺者模式 (Strangler Fig Pattern)** 與 **依賴圖優先 (Dependency Graph First)** 的原則，嚴禁用「一鍵重建全站」或「大面積覆寫」的方式改寫。
+
+### A. 遷移與重建的邊界
+1. **全新生成 (New Generation)**: 適用 V5.1 規範的 5-Pillar Structure，產生全新的合規頁面。
+2. **遺留功能遷移 (Legacy Migration)**: 必須調用 `migrate-legacy-to-uikit` 執行。**嚴禁**刪除既有業務邏輯 (Business Logic)、API Contract 與 Domain Model。必須恪守「先保證功能完整，再調整對齊 UI-kit」原則，僅限於安全拆除 UI 外部佈局 (Shell-only Teardown) 與新 UI-kit wrapper 的組裝。
+3. **宏觀遷移調度 (Macro Orchestration)**: 針對全站層級的遷移動作，應優先調用 `orchestrate-legacy-migration`。系統會將全站範圍切分為具有拓樸關係的依賴圖 (DAG)，以 Feature 為單位精準且逐一遷移，不可無視依賴關係盲目推進。
+
+### B. 雙軌過渡路由 (Dual-Track Shell Transition)
+在全站遷移計畫徹底完成之前，**不允許一刀切斷**舊有的全局佈局外殼 (即 `app.component.html` 內原本存在的 Legacy Shell)。
+- 新舊路由應該採齊行策略並存 (Hybrid Routing)，將已通過驗證 (Verified) 的完成路由逐步掛載至新 UI-kit 的 `MainLayoutComponent` 或路由層次之下。
+- 只有當所有的依賴圖節點完成遷移驗證、完全無任何其他內部路由依賴舊款全域佈局，且全站最後一次 `build` 成功時，才能進行最終的全局退役 (Final Teardown)。
+
+---
+
+## 15. 安全屏障與防呆合約 (Migration Hard Gates)
+
+在進行遷移操作時，以下條件若遭觸發即視為 **Terminal Failure (終止性失敗)**，系統應立刻中斷作業並將錯誤呈報，嚴禁強行推進以保護專案源碼安全：
+
+1. **Build Gate Violation**: 所有的節點狀態被標定為 `verified` (完成) 前，皆必須取得命令列的真實編譯 (`ng build` 或專案設定好的 build script) 且退場碼為成功 (exit code = 0)，**不得以任何「代碼檢查無誤」的心態直接回報結案**。
+2. **Business Space Violation**: 絕對禁止擅自更動 API interface、服務端約定、資料流向或提交表單的本質邏輯。如因套用佈局導致原始 Template 上的事件偵聽或錯誤資料驗證狀態不見了，便構成違反依賴合約。
+3. **Batch Regex Override**: 當重構觸及大規模元件改名、搬移或引用更改時，**嚴禁**使用廣域正則表達式 (Regex) 直接大量批次改寫；應當使用 AST 解析技術 (例如 schemas、ts-morph 等) 或是以最保險的逐檔精細修正為標準。
+4. **State Machine Inconsistency**: 該宏觀遷移程序必須確保專案目錄內的 `migration-state.json` 時刻追蹤各節點的健康與完成度。且該狀態機不可跳躍執行，務必遵從 `pending` -> `migrating` -> `verified` / `failed` 流程，在發生錯誤或建置失敗時具備 Rollback (Checkpoint) 阻斷能力以維護舊日環境安全。
+
+---
+
+## 16. 子技能職責與協作劃界 (Orchestration vs Specialized Skills)
+
+遷移系統不允許「越俎代庖」；各技能邊界應具有清晰的權責，以降低系統性風險：
+
+- **Macro Orchestrator (`orchestrate-legacy-migration`)**: 負責通盤掃描舊專案、判讀技術棧，產出狀態機 (State Machine) 與關係依賴拓樸圖 (DAG) 作為全時調度總管；並負責最後一哩路移除殘舊 Shell 殼。**Orchestrator 不親自修改單個 Feature 源碼或畫面設計**。
+- **Refactor Skill (`migrate-legacy-to-uikit`)**: 扮演重構的純「執行端」，聽令於上述的 Orchestrator 指令或單獨呼叫；其只針對單一節點被派發的目標，在保證業務邏輯無損之下，執行舊殼拆解、狀態抽離、綁定新的 UI-kit 殼等勞力密集動作。**Refactor Skill 不准干預全站路由拓撲或其它節點跳轉**。
+
+---
+*增補日期：2026-04-01 (V5.3 - Legacy Migration Addendum)*
