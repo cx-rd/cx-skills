@@ -1,69 +1,196 @@
 ---
 name: orchestrate-legacy-migration
-description: 一鍵全站遷移調度器。負責盤點整個高度成熟的 legacy Angular 專案，將全站建立為 DAG (依賴圖) 遷移模型，維護狀態機並依序調用 migrate 執行絞殺者遷移，最後透過雙軌過渡統一拔除舊全域外殼。
+description: 一鍵全站遷移調度器。用於將成熟的 legacy Angular 專案遷移到 UI-kit 架構，建立 DAG 與狀態機，逐節點推進 route、shell surface 與 template parity，強制通過 build gate、capability mapping 與 product smoke gate 後才允許 cutover。
 ---
 
 # orchestrate-legacy-migration
 
 ## 一、技能定位
-本技能是**巨集遷移任務的全局調度器 (Macro Migration Orchestrator)**。
-它專門設計用來實現「一句話把整個龐大老專案搬上 UI-kit 架構」的高階任務。本身不碰單一 feature 的細部重構，而是負責：
-- 切分戰場
-- 解析依賴圖 (DAG)
-- 維護狀態機 (State Machine)
-- 嚴格控管節點切換
-- 監測斷點與執行回溯 (Rollback)
 
-這是一套**自動化的絞殺者重構調度系統** (Automated Strangler Refactoring Orchestration System)。
+本技能是巨集遷移任務的全局調度器。
+
+它的工作不是直接完成單一畫面的細節重構，而是負責：
+
+- 建立 route feature 與 shell surface 的遷移 DAG
+- 維護可續跑的 migration state machine
+- 逐節點委派遷移與驗證
+- 在 final cutover 前確保 template parity，而不只是 build success
+
+本技能的完成標準是：
+
+- 結構完成遷移
+- 共享 shell surface 已被明確建模
+- UI-kit template 已依分類完成 adopt、adapt 或 deferred-with-record
+- 最終 cutover 通過 build gate 與最小 product smoke gate
 
 ## 二、核心原則
-1. **Dependency Graph over Linear Queue**: 真實專案有交叉依賴，嚴禁無腦線性遷移。必須先構建以 Feature 為單位的 DAG (Migration Graph)，無依賴者先跑，有依賴者後跑。
-2. **Micro-Batching over Bulk Simulation**: 嚴禁一次宣稱完成多個節點。每次只允許推進一個 Feature Node，完成後必須經過真實驗證才可進入下一個節點。
-3. **Dual-Track Shell Transition**: 嚴禁一刀切替換 Root Shell (`app.component.html`)。必須採取雙軌過渡 (Hybrid Routing)，新舊 Layout 並存，直到所有舊路由都被絞殺完畢才移除舊殼。
-4. **State Machine & Resumability**: 必須在專案根目錄維護 `migration-state.json`，支援中斷後接續 (Resume) 與 Debug。
-5. **Checkpoint & Rollback**: 每個 Feature 遷移成功後必須建立 Checkpoint (e.g. Git commit)。一旦子技能回報任務失敗，允許一鍵 Rollback 回上一個完全穩定的 Checkpoint。
-6. **Build Gate over Narrative Success**: 任何 `verified` 都必須建立在實際編譯成功之上，不允許以「看起來改完了」作為成功判定。
-7. **AST over Regex**: 任何跨檔案 class rename、symbol rename、import rewrite，不得使用盲目 regex 批次替換，必須使用 AST、schematics、ts-morph 或逐檔精準修改。
 
----
+1. **Dependency Graph over Linear Queue**
+   真實專案必須建立 DAG，不得無腦線性遷移。
+2. **Route + Shell Surface over Route Only**
+   遷移節點不得只包含 route feature，必須包含 shell-level capabilities。
+3. **Template Parity over Build Only**
+   `verified` 不等於 compile success；必須同時滿足 template、behavior 與 capability mapping。
+4. **Dual-Track Shell Transition**
+   Root shell 必須雙軌過渡，直到 legacy 依賴清空。
+5. **State Machine & Resumability**
+   必須維護 `migration-state.json`，支援 resume、rollback 與 deferred record。
+6. **Capability Matrix First**
+   shell cutover 前必須先盤點 legacy shell 提供的能力與未來 owner。
+7. **AST over Regex**
+   跨檔案 rename、import rewrite、symbol replacement 不得使用盲目 regex。
+8. **Scope Decomposition before Mapping**
+   遇到寬語意 capability 或 template，不得直接以名稱硬對位，必須先拆分 scope 再做 mapping。
 
-## 三、禁止事項 (Non-Negotiable Guardrails)
-
-Orchestrator 一律禁止以下行為：
+## 三、禁止事項
 
 1. **禁止模擬代跑**
-   不得在尚未逐節點完成實作與驗證前，直接宣稱多個 Feature 已完成遷移。
-2. **禁止只改 Router 不改 Feature**
-   不得只更新 `app.routes.ts`、lazy route import、component 名稱引用，卻不核對對應 feature 檔案中的真實 export / class 宣告是否同步完成。
-3. **禁止 Regex 暴力改名**
-   不得用廣域 regex 直接替所有 `class`、`symbol`、`import`、`identifier` 加上 `Component` 或其他後綴。
-4. **禁止跳過實體編譯**
-   不得在未執行 `npm run build`、`ng build` 或專案指定 build 指令前，將任何節點狀態改為 `verified`。
-5. **禁止假性 Checkpoint**
-   若編譯未通過，不得建立 Checkpoint，不得更新 `lastStableCheckpoint`。
-6. **禁止硬寫覆蓋式遷移**
-   若子技能回報拆解風險或遷移不安全，必須立即中止，不能以大面積覆寫 TS/HTML 方式硬推完成。
+   不得在未逐節點完成前宣稱整站完成。
+2. **禁止只改 Router 不改 Capability**
+   不得只改 `app.routes.ts`、children routes 或 shell wrapper，卻未處理對應 shell behavior。
+3. **禁止以 build pass 取代 parity 驗收**
+   build 通過只能證明可編譯，不能直接標記 `verified`。
+4. **禁止隱性遺漏 template**
+   若 UI-kit template 尚未落地，不得假裝完成；必須 `adapt` 或 `deferred-with-record`。
+5. **禁止無 owner 的 shell cutover**
+   若 capability matrix 中仍有 `unmapped` 能力，不得做 final teardown。
+6. **禁止假性 checkpoint**
+   若 build 或 parity gate 未通過，不得更新 `lastStableCheckpoint`。
 
----
+## 四、Template Classification Layer
 
-## 四、狀態機合約 (Migration State Machine)
+所有 UI-kit template 在進入 Phase B 前，必須先分類。
 
-Orchestrator 在啟動後，必須在專案目錄或 `.agent/` 裡建立並隨時更新以下架構的 JSON/TypeScript 物件：
+### Class A: Pure Presentational Template
+
+特徵：
+
+- 只提供 UI style、layout、slots、wrapper
+- 不帶既定產品 workflow
+
+處理規則：
+
+- 預設必須套用
+- 以 wrapper、projection 或既有 component logic 接入
+- 不得因為既有邏輯存在就跳過 template migration
+
+典型例：
+
+- login style shell
+- page wrapper
+- simple dashboard wrapper
+
+### Class B: Interaction Skeleton Template
+
+特徵：
+
+- 帶標準互動骨架
+- 需要綁定 app-specific data source 或 action
+
+處理規則：
+
+- 必須建立 adapter layer
+- 驗收標準必須包含真實 input/output 與資料綁定
+
+典型例：
+
+- toolbar
+- sidebar
+- notification bell / popover
+- user menu
+
+### Class C: Opinionated Product Template
+
+特徵：
+
+- 帶內建產品語意
+- 與既有產品概念不一定一一對應
+
+處理規則：
+
+必須先做 mapping decision，且只能是：
+
+- `adopt`
+- `adapt`
+- `defer-with-record`
+
+典型例：
+
+- settings-page
+- all-notifications
+- profile/security/notifications sections
+
+## 五、Scope Decomposition Rule
+
+對任何寬語意 capability、route、template 或 shell action，orchestrator 在做 mapping 前都必須先做 scope decomposition。
+
+最少要拆成以下 scope：
+
+- `user-scope`
+  只影響單一使用者
+- `system-scope`
+  影響整個系統或所有使用者
+- `domain-scope`
+  影響特定模組、專案、workspace 或 tenant
+- `shared-shell-scope`
+  屬於全域殼層互動，不是單一路由業務頁
+
+規則：
+
+1. 若同名 capability 橫跨多個 scope，不得合併驗收。
+2. template mapping 必須明確聲明它作用於哪個 scope。
+3. 若 UI-kit template 的預設語意與現有 scope 不一致，必須 `adapt` 或 `defer-with-record`。
+4. 不得把 `user-scope` template 直接套到 `system-scope` 或 `domain-scope`。
+
+這條規則適用於所有寬語意概念，不只 `settings`，也包括：
+
+- notifications
+- profile
+- preferences
+- security
+- workspace
+- billing
+- admin
+- dashboard
+
+## 六、狀態機合約
+
+Orchestrator 必須在專案根目錄維護 `migration-state.json`，至少支援以下欄位：
 
 ```typescript
-interface MigrationState {
-  features: {
-    name: string;
-    routePath: string;
-    status: 'pending' | 'migrating' | 'verified' | 'failed';
-    dependencies: string[];
-    isSharedLogic: boolean;
-    lastBuildCommand?: string;
-    lastBuildPassed?: boolean;
-    lastBuildAt?: string;
-    lastErrorSummary?: string;
-  }[];
+interface MigrationNode {
+  name: string;
+  routePath: string | null;
+  kind: 'route-feature' | 'shell-surface' | 'shared';
+  status: 'pending' | 'migrating' | 'verified' | 'failed' | 'deferred';
+  dependencies: string[];
+  isSharedLogic: boolean;
+  templateType?: 'presentational' | 'interaction' | 'opinionated' | 'none';
+  strategy?: 'adopt' | 'adapt' | 'defer-with-record' | 'none';
+  routeWired?: boolean;
+  templateApplied?: boolean;
+  behaviorMapped?: boolean;
+  smokeChecked?: boolean;
+  lastBuildCommand?: string;
+  lastBuildPassed?: boolean;
+  lastBuildAt?: string;
+  lastErrorSummary?: string;
+  deferredReason?: string;
+}
 
+interface CapabilityMatrixItem {
+  capability: string;
+  scope: 'user-scope' | 'system-scope' | 'domain-scope' | 'shared-shell-scope' | 'unknown';
+  legacySource: string;
+  futureOwner: string;
+  migrationStrategy: string;
+  doneCriteria: string;
+  status: 'mapped' | 'unmapped' | 'deferred';
+}
+
+interface MigrationState {
+  features: MigrationNode[];
+  capabilities: CapabilityMatrixItem[];
   global: {
     shell: 'legacy' | 'hybrid' | 'uikit';
     currentPhase: 'A' | 'B' | 'C';
@@ -72,144 +199,195 @@ interface MigrationState {
     buildCommand: string;
     environmentReady: boolean;
   };
-
   lastStableCheckpoint: string;
 }
 ```
 
 狀態更新規則：
-- 只有在單一節點完成遷移且 build exit code = 0 後，才允許把 `status` 從 `migrating` 改成 `verified`。
-- 若 build 失敗，必須把該節點標記為 `failed`，寫入 `lastErrorSummary`，並中止整體流程。
-- 任何時候都不得跳過 `migrating` 直接從 `pending` 變成 `verified`。
 
----
+- 不得從 `pending` 直接跳到 `verified`
+- `verified` 至少要求：
+  - `lastBuildPassed = true`
+  - `routeWired = true` 或不適用
+  - `templateApplied = true` 或 `strategy = defer-with-record`
+  - `behaviorMapped = true`
+  - `smokeChecked = true`，若此節點屬於 shell-surface 或 full-page template
+- `deferred` 只能在 `strategy = defer-with-record` 且 `deferredReason` 已寫明時使用
 
-## 五、執行階段 (3-Phase Engineering Pipeline)
+## 七、Phase A: Discovery And Graph Building
 
-### Phase A: Global Discovery & Graph Building
-**「繪製依賴拓樸圖，備妥狀態機」**
+### 1. Dependency Contract Detection
 
-1. **依賴環境注射與版本線辨識 (Dependency Contract Detection)**
-   Orchestrator 必須先讀取專案 `package.json`，辨識目前專案所屬的 Angular 主版本線，並解析 `@cx-rd/ui-kit` 的依賴來源型態。不得僅以「是否已安裝」作為判斷依據，必須區分 registry / git / file 等來源。
+先讀取 `package.json`，判定 Angular 主版本與 `@cx-rd/ui-kit` 來源。
 
-   - **判定規則**
-     - **若專案 Angular major version = 19**
-       `@cx-rd/ui-kit` 合法來源為 npm registry semver dependency（如 `^0.0.x`）。
-       若尚未安裝，執行：
-       ```bash
-       npm install @cx-rd/ui-kit
-       ```
-       若 `package.json` 中不存在 `@angular/cdk` 相依，則補齊與 Angular major 相符的版本：
-       ```bash
-       npm install @angular/cdk@19
-       ```
-     - **若專案 Angular major version = 21**
-       `@cx-rd/ui-kit` 不得自動安裝 npm registry 正式版，必須使用 Angular 21 專用來源，例如 git branch / git tag dependency。
-       合法來源示例：
-       ```json
-       "@cx-rd/ui-kit": "git+https://github.com/cx-rd/cx-ui-kit.git#angular21-application"
-       ```
-       若專案缺少此依賴，Orchestrator 不得擅自安裝 Angular 19 主線套件，必須中止並回報：
-       > 此專案屬於 Angular 21 支線，請先配置 Angular 21 專用 ui-kit 來源後再執行遷移。
+- Angular 19：允許 registry semver dependency
+- Angular 21：必須使用 Angular 21 專用來源，例如 git dependency
+- 不支援版本：立即停止
 
-       若 `package.json` 中不存在 `@angular/cdk` 相依，則補齊與 Angular major 相符的版本：
-       ```bash
-       npm install @angular/cdk@21
-       ```
-     - **若專案 Angular major version 不屬於目前支援範圍**
-       Orchestrator 必須停止並明確回報不支援，不得自行猜測安裝策略。
+必須驗證：
 
-   - **驗證要求**
-     Orchestrator 必須驗證以下項目：
-     1. `package.json` 是否存在 `@cx-rd/ui-kit`
-     2. 該依賴來源是否符合目前 Angular 主版本線
-     3. `@angular/cdk` 是否與 Angular major version 對齊
-     4. 不得將 Angular 19 的 ui-kit contract 注入 Angular 21 專案
-     5. 不得將 Angular 21 的 git dependency contract 注入 Angular 19 專案
+- `@cx-rd/ui-kit` 是否存在
+- 來源是否符合 Angular 主版本線
+- `@angular/cdk` 是否與 Angular major 對齊
 
-2. **環境感知檢查 (Environment Awareness Checklist)**
-   若 `@cx-rd/ui-kit` 來自 git 或 file source，必須額外檢查：
-   1. `tsconfig.json` 或 `tsconfig.base.json` 的 `paths` 是否正確指向 library 的 `src/public-api`
-   2. `MainLayoutComponent`、page wrapper 與相關 public symbols 是否可被專案解析
-   3. style entry、builder 設定與 library source import 是否可共存
-   4. build 指令是否已知，且可以在目前環境內被實際執行
+### 2. Environment Awareness Checklist
 
-   若上述任一項不成立，必須先回報環境未備妥，不得進入 Phase B。
+若 UI-kit 來自 git 或 file source，必須額外檢查：
 
-3. **全站路由與依賴解析 (Topological Scan)**
-   不但要找出 Component 與 Routes，更要掃描 Service 與 Shared Module 的交叉依賴 (Cross-Dependencies)。
-   - **Shared Rule**: 如果某個 feature 帶有與其他 feature 共用的 business logic dependency，必須將它標記為 `Shared Migration Unit` 並延後 (Deferred)，直到所有相依的 feature 都被分析完畢。
+- `tsconfig` path 是否指向 `src/public-api`
+- public symbols 是否可解析
+- styles / assets / builder 設定是否可共存
+- build command 是否可在目前環境實際執行
 
-4. **產出 Migration DAG (狀態機初始化)**
-   - 根據無依賴 → 有依賴的順序建立 DAG。
-   - 建立並寫入初始的 `MigrationState`。
-   - 明確寫入 `global.buildCommand`。
-   - 明確寫入 `global.environmentReady`。
+若未備妥，不得進入 Phase B。
 
-### Phase B: DAG Execution & Tracking
-**「依賴圖驅動的絞殺者流水線」**
+### 3. Capability Matrix Discovery
 
-進入嚴格單節點迴圈：
+必須先盤點 legacy shell 提供的能力，至少包含：
 
-1. **挑選結點**
-   從狀態機挑選 `status: 'pending'` 且 `dependencies` 皆已為 `verified` 的單一 Feature。
-2. **狀態切換**
-   將該 Feature 標記為 `migrating`。
-3. **委派重構**
-   必須調用 `migrate-legacy-to-uikit` 處理單一 Feature，不得一次派發多個節點。
-4. **跨檔案一致性檢查**
-   子技能完成後，必須逐一核對：
-   - route import 是否存在
-   - 對應 component class / export 是否存在
-   - feature module / standalone component / provider 引用是否一致
-   - 沒有遺留錯誤的 symbol rename
-5. **強制實體編譯閘門**
-   必須執行 `global.buildCommand`，例如：
-   ```bash
-   npm run build
-   ```
-   或：
-   ```bash
-   ng build
-   ```
-   只有在終端回傳 exit code = 0 時，才允許推進。
-6. **Checkpoint & Rollback**
-   - **Pass**: build 成功後，記錄 Git Commit (Checkpoint)，將狀態標記為 `verified`。
-   - **Fail**: 若 build 失敗或一致性檢查失敗，必須：
-     - 寫入 `lastErrorSummary`
-     - 將此節點標記為 `failed`
-     - 回復到 `lastStableCheckpoint`
-     - 中止整體流程，等待人類介入
-7. **人工確認節點節奏**
-   若任務屬於高風險大型專案，完成單一節點後應停下並向使用者回報，再決定是否進入下一個 DAG node。
+- login entry
+- fullscreen routes
+- sidebar navigation
+- toolbar actions
+- user menu
+- settings entry
+- notification bell
+- notification center
+- logout flow
 
-### Phase C: Dual-Track Shell Cutover
-**「平滑過渡與無損拆除」**
+對於寬語意 capability，必須先做 scope decomposition，再寫入 capability matrix。
 
-1. **Hybrid Shell Injection (雙軌共存)**
-   在最外層路由中，不要直接刪掉 legacy shell，而是引入 `MainLayoutComponent` 作為並行路由 (Parallel Route Anchor)。
-2. **Gradual Routing Transition (漸進導流)**
-   將狀態機中標記為 `verified` 的 Route 節點，逐步掛載到 `MainLayout` children 之下；未遷移完畢或 `failed` 的節點，繼續留在 Legacy Shell 的 `<router-outlet>`。
-3. **Final Teardown (拔除舊鷹架)**
-   只有在以下條件全部成立時，才允許拔除舊殼：
-   - `features` 陣列全數為 `verified`
-   - 無任何路由仍依賴舊有 Shell
-   - 最後一次全站 build exit code = 0
-   - 沒有待處理的 `failed` 節點
+例如：
 
-   之後才可：
-   - 安全刪除 `app.component.html` 內殘留的舊有 Global Header、Sidebar、`100vh` 鷹架
-   - 將狀態機切換為 `global.shell = 'uikit'`
+- `settings`
+  可能拆成 `user-scope`、`system-scope`
+- `notifications`
+  可能拆成 `user-scope`、`domain-scope`、`shared-shell-scope`
+- `profile`
+  可能拆成 `user-scope`、`system-scope`
 
----
+每一項都必須有：
 
-## 六、執行策略補充
+- `scope`
+- `legacySource`
+- `futureOwner`
+- `migrationStrategy`
+- `doneCriteria`
 
-1. **每次只處理一個 Feature**
-   不允許「Projects, Cases, Dispatch, Ticket 一次全改」這種展示式推進。
-2. **優先使用精準程式結構工具**
-   遇到跨檔案 rename、import rewrite、decorator 對應調整時，優先使用 AST、schematics、ts-morph，或逐檔人工修正。
-3. **驗證比推進更重要**
-   若無法在當前環境執行 build，就不能宣稱節點完成。
-4. **一旦失敗，立即停機**
-   失敗是中止點，不是重試點。未經人類確認，不得自動續跑下一個節點。
+若 capability 無 owner，不得宣稱 discovery 完成。
+
+### 4. DAG Construction
+
+除了 route feature，也必須建立 shell-surface nodes。最少應考慮：
+
+- `AuthEntry`
+- `ShellNavigation`
+- `ShellUserMenu`
+- `ShellNotifications`
+- `UserSettings`
+- `FullscreenPages`
+
+若專案中不存在某個 capability，必須顯式標記為不適用，而不是忽略。
+
+## 八、Phase B: DAG Execution
+
+### 1. 單節點推進
+
+每次只挑選一個 `pending` 且 dependencies 皆已完成的節點。
+
+### 2. 委派重構
+
+對單一節點調用子技能或進行精準修改。
+
+### 3. 一致性檢查
+
+至少核對：
+
+- route import 存在
+- component / export 存在
+- provider / standalone / module 引用一致
+- shell action 與 destination 一致
+- scope decomposition 已完成
+- template classification 與 strategy 已落地
+
+### 4. Build Gate
+
+必須執行真實 build command，exit code = 0 才可繼續。
+
+### 5. Parity Gate
+
+若節點屬於 shell-surface 或 full-page template，build pass 後還必須額外檢查：
+
+- template 是否已套用
+- 必要 adapter 是否已存在
+- capability matrix 的 done criteria 是否滿足
+
+### 6. Deferred Gate
+
+若節點無法立即完成，只有在以下條件同時成立時才可 `deferred`：
+
+- 已做出 `adopt/adapt/defer-with-record` 決策
+- `deferredReason` 已清楚寫明
+- 不影響目前 cutover 的完整性
+
+### 7. Checkpoint & Rollback
+
+- Pass：build 與 parity gate 皆成功後才可 checkpoint
+- Fail：標記 `failed`，寫入 `lastErrorSummary`，回到 `lastStableCheckpoint`，停止流程
+
+## 九、Phase C: Dual-Track Shell Cutover
+
+### 1. Hybrid Shell Injection
+
+Root shell 必須先採雙軌過渡，未完成節點留在 legacy shell，已完成節點逐步掛進 UI-kit shell。
+
+### 2. Gradual Transition
+
+只能導流已完成 parity 的節點。
+
+### 3. Final Teardown
+
+只有在以下條件全部成立時，才允許移除 legacy shell：
+
+- 所有必要節點皆為 `verified` 或合法 `deferred`
+- capability matrix 沒有 `unmapped`
+- login、notifications、settings、logout、user menu 等 shell surface 已有明確 owner
+- 最後一次 build exit code = 0
+- 最小 smoke checklist 通過
+
+之後才可：
+
+- 安全刪除舊有 global header/sidebar/topbar/root layout
+- 將 `global.shell` 切為 `uikit`
+
+## 十、最小 Product Smoke Checklist
+
+以下項目至少要在 final cutover 前驗證一次：
+
+- `/login` 可進
+- login submit flow 正常
+- `returnUrl` 正常
+- sidebar 可渲染且導航正常
+- toolbar 可渲染
+- user menu 可開啟
+- settings action 有明確 destination
+- notification bell 已接線，或已合法 deferred
+- `/notifications` 可進，或已合法 deferred
+- logout 正常
+
+若任一項不成立，不得宣稱整站 migration 完成。
+
+## 十一、執行策略補充
+
+1. **Class A template 預設必須落地**
+   若 UI-kit 只提供 style shell，應優先保留既有邏輯並替換視覺層。
+2. **Class B template 優先用 adapter**
+   不要重寫 domain service；優先將既有資料與事件橋接到 UI-kit。
+3. **Class C template 先做產品語意映射**
+   未做 mapping decision 前，不得直接宣稱完成。
+4. **對寬語意 capability 先做 scope decomposition**
+   不要把名稱相同的功能混成同一節點；必須先拆成 user、system、domain、shared-shell 等 scope。
+4. **無法完成時要顯式記錄**
+   `deferred` 是顯式狀態，不是遺漏。
+5. **驗證比推進重要**
+   無法 build 或無法通過 parity gate，就停止，不得續跑下一節點。
