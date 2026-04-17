@@ -89,6 +89,7 @@ v21 build-package 的預期審計結果通常會是：
 | `NG8002: Can't bind to 'X' since it isn't a known property` | 組件選用錯誤或未導入 | 1. 檢查 `imports` 是否包含該組件。<br>2. 檢查屬性名是否拼錯（例如應為 `route` 而非 `path`）。<br>3. 若使用 `lib-settings-page`，**禁用** `[tabs]` 綁定，改用 DI Provider。 |
 | 樣式丟失 (Style missing) | `styles.scss` 未正確載入，或仍使用舊版 `@import` 入口 | 檢查 `src/styles.scss` 是否用 `@use '@cx-rd/ui-kit/[AUDITED_STYLE_MODULE_PATH]'` 載入正確模組。 |
 | Sidebar / App Shell 高度沒有吃滿 | root height baseline 不完整，導致下游 `height: 100%` 無法成立 | 1. 檢查 `html`, `body`, `app-root` 是否都有明確的 `height: 100%`。<br>2. 檢查 `src/app/app.component.scss` 是否有 `:host { display: block; height: 100%; }`。<br>3. 禁止用 `100vh` wrapper 當成初始化階段的補丁。 |
+| Toast 沒有顯示或跨 route 消失 | `lib-toast-viewport` 沒有掛在 app root，或被錯誤放在 shell / page 內 | 1. 檢查 `src/app/app.component.html` 是否存在且只存在一個 `<lib-toast-viewport>`。<br>2. 檢查 `src/app/app.component.ts` 是否有匯入 `ToastViewportComponent`。<br>3. 禁止在 `MainLayout`、page component 或 feature route host 內重複渲染 toast viewport。 |
 | 找不到 `@cx-rd/ui-kit` | 套件未正確安裝，或本地 `file:` 路徑失效 | Published Package：先檢查套件是否已安裝且版本與 Angular 21 對齊。<br>External Local Package：再檢查 `package.json` 的 `file:` 路徑與必要時的 `preserveSymlinks: true`。 |
 
 ---
@@ -139,7 +140,7 @@ app-root {
 
 ---
 
-### 步驟 7：清理 AppComponent（建立 Routing Shell）
+### 步驟 7：清理 AppComponent（建立 App Root Infrastructure Host）
 
 同步建立或更新以下三個檔案：
 
@@ -147,6 +148,7 @@ app-root {
 
 ```html
 <router-outlet></router-outlet>
+<lib-toast-viewport></lib-toast-viewport>
 ```
 
 2. `src/app/app.component.ts`
@@ -154,11 +156,12 @@ app-root {
 ```typescript
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { ToastViewportComponent } from '@cx-rd/ui-kit';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, ToastViewportComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -176,7 +179,8 @@ export class AppComponent {}
 ```
 
 > [!CAUTION]
-> **嚴禁**在 `app.component.html` 中加入任何 `<nav>`、`<header>`、`<footer>`、Landing Page 內容或自訂佈局。`AppComponent` 的唯一職責是作為路由容器。
+> **嚴禁**在 `app.component.html` 中加入任何 `<nav>`、`<header>`、`<footer>`、Landing Page 內容或自訂佈局。
+> `AppComponent` 是 app root infrastructure host，只允許放置路由容器與全域基礎設施，例如 `<router-outlet>` 與唯一的 `<lib-toast-viewport>`。
 
 ---
 
@@ -197,13 +201,14 @@ export class AppComponent {}
 以下所有條件都必須滿足，才算初始化成功：
 
 - [ ] `ng serve` 可以正常啟動（無編譯錯誤）。
-- [ ] `app.component.html` 只有 `<router-outlet>`。
-- [ ] `src/app/app.component.ts` 使用 `templateUrl` 與 `styleUrl`，且 `imports` 包含 `RouterOutlet`。
+- [ ] `app.component.html` 包含且只包含一個 `<router-outlet>` 與一個 `<lib-toast-viewport>`，且沒有任何 visual layout chrome。
+- [ ] `src/app/app.component.ts` 使用 `templateUrl` 與 `styleUrl`，且 `imports` 包含 `RouterOutlet` 與 `ToastViewportComponent`。
 - [ ] `src/app/app.component.scss` 存在，且 `:host` 具有 `display: block; height: 100%`。
 - [ ] `angular.json` 包含 UI Kit 的 `assets` 映射。
 - [ ] `src/styles.scss` 沒有自創顏色或主題，且已透過 `@use '@cx-rd/ui-kit/[AUDITED_STYLE_MODULE_PATH]'` 載入 v21 樣式入口。
 - [ ] `html`, `body`, `app-root` 具有明確高度基準，避免 app shell / sidebar 高度失效。
 - [ ] `src/index.html` 包含 Material Icons 連結。
+- [ ] 專案已具備全域 toast 能力，且 `lib-toast-viewport` 的 owner 為 `AppComponent` 而不是 `MainLayout` 或任何 page component。
 
 初始化完成後，可立即使用 `generate-unified-page` 或 `generate-app-orchestrator` Skill 開始生成業務頁面。
 
