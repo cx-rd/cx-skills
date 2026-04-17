@@ -81,6 +81,15 @@ Verifier 不可只靠 UI-kit 元件名字硬編碼判定 ownership。
 - `In-Shell` feature 不可在自己的 consumer component 中再渲染 `MainLayoutComponent`
 - `In-Shell` feature 若使用功能完整的 UI-kit page component，允許其保有內部 header / tabs / sidebar，但不可再重建第二層 app shell
 
+### Login Contract Audit
+
+若 login feature 使用 `LoginPageComponent` 或直接渲染 `<lib-login>`：
+
+- consumer template 必須綁定 `(submitted)`，將 UI-kit 的登入資料事件接回 app handler
+- 不可把 `LoginPageComponent` 當成純展示頁而完全忽略登入事件
+- 若 `<lib-login>` 存在但沒有 `(submitted)` 綁定，直接 fail
+- 不可在 consumer 端再額外重建 account/password form 與 UI-kit 登入頁並存
+
 ## App Shell Audit
 
 `MainLayoutComponent` 視為全域 shell owner。
@@ -148,6 +157,7 @@ Verifier 必須依母規格與 specialized skill 檢查命名。
 - shell ownership 沒有重複
 - shell height baseline 正確
 - UI-kit 功能完整頁面元件的 ownership 使用方式正確
+- login 頁的 `submitted` contract 已正確接線
 - full-page UI-kit component 沒有被錯誤重包
 - naming contract 正確
 - scroll ownership 位於正確 container

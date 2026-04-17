@@ -240,7 +240,7 @@ interface MigrationState {
 先讀取 `package.json`，判定 Angular 主版本與 `@cx-rd/ui-kit` 來源。
 
 - Angular 19：允許 registry semver dependency
-- Angular 21：必須使用 Angular 21 專用來源，例如 git dependency
+- Angular 21：允許 registry、git、或 build-package `file:` 來源，但必須確認 UI-kit 與 Angular major 對齊，且來源可解析為合法 package 或 source
 - 不支援版本：立即停止
 
 必須驗證：
@@ -251,10 +251,16 @@ interface MigrationState {
 
 ### 2. Environment Awareness Checklist
 
-若 UI-kit 來自 git 或 file source，必須額外檢查：
+若 UI-kit 來自 registry 或 build-package `file:` 來源，至少必須檢查：
+
+- public symbols 是否可解析
+- `node_modules/@cx-rd/ui-kit/lib/core/styles/index.scss` 是否存在或有等效樣式入口
+- `node_modules/@cx-rd/ui-kit/src/assets` 是否存在或有等效資產輸出
+- build command 是否可在目前環境實際執行
+
+若 UI-kit 來自 source / git workspace，則另加檢查：
 
 - `tsconfig` path 是否指向 `src/public-api`
-- public symbols 是否可解析
 - styles / assets / builder 設定是否可共存
 - build command 是否可在目前環境實際執行
 

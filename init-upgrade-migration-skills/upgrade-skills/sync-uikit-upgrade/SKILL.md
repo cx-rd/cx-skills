@@ -60,6 +60,7 @@ description: 將一個已初始化且已套用過 UI-kit 模板或 contract 的 
 - 是否符合 feature contract
 - 是否存在 contract 漂移
 - 是否仍保有必要 integration point
+- 若專案以 build-package 形式安裝 UI-kit，style / assets 路徑是否對應 package 內實際輸出，而非沿用舊版假設
 
 ---
 
@@ -179,7 +180,7 @@ description: 將一個已初始化且已套用過 UI-kit 模板或 contract 的 
 例如：
 - NotificationPopover input renamed
 - SETTINGS_SECTIONS is now required
-- ui-kit.scss entrypoint replaces legacy style imports
+- v21 build-package style entry is `@use '@cx-rd/ui-kit/lib/core/styles'`, not `ui-kit.scss`
 - All Notifications route bridge is required
 - local shell is no longer allowed for settings
 #### 2. Customization Zones
@@ -238,7 +239,7 @@ Detected UI-kit usage:
 - SETTINGS_TABS found
 - SETTINGS_SECTIONS missing
 - navigation.config.ts present
-- ui-kit.scss not imported
+- v21 build-package style module `@cx-rd/ui-kit/lib/core/styles` not imported
 - local settings shell detected
 ```
 ---
@@ -267,6 +268,6 @@ component input、output、token 或 provider 不相容。
 Upgrade Deltas:
 1. Missing SETTINGS_SECTIONS provider
 2. NotificationPopover input outdated
-3. ui-kit.scss entrypoint missing
+3. v21 build-package style entry missing or still using legacy `ui-kit.scss`
 4. All Notifications route bridge missing
 ```

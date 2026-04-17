@@ -27,20 +27,22 @@ description: 產生或更新使用 `@cx-rd/ui-kit` `LoginPageComponent` 的登�
 
 ## 實作契約
 
-1. 從 `@cx-rd/ui-kit` 匯入 `LoginPageComponent`。
-2. 在 template 中直接渲染 `<lib-login>`。
-3. 讓 route host 保持適合 full-page login 的高度。
-4. 需要時在 consumer component 處理登入成功後的導頁或 auth 狀態。
-5. 在 `app.routes.ts` 中註冊登入路由。
+1. 從 `@cx-rd/ui-kit` 匯入 `LoginPageComponent`，若 consumer 需要明確型別，亦可匯入 `LoginCredentials`。
+2. 在 template 中直接渲染 `<lib-login (submitted)="onLogin($event)">`。
+3. consumer component 必須提供登入橋接處理，例如 `onLogin(credentials: LoginCredentials)`，將 UI-kit 的 `submitted` 事件接回 app auth flow。
+4. 讓 route host 保持適合 full-page login 的高度。
+5. 在 consumer component 處理登入成功後的導頁或 auth 狀態。
+6. 在 `app.routes.ts` 中註冊登入路由。
 
 ## Fail If
 
 - `<lib-login>` 被另一層 page chrome 或 full-page card 包住。
+- `<lib-login>` 沒有綁定 `(submitted)` 卻宣稱已完成登入流程。
 - consumer 重複建立 UI-kit 已擁有的標題、副標、CTA 或裝飾性整頁布局。
 - 使用 inline metadata。
 
 ## 參考模板
 
 ```html
-<lib-login></lib-login>
+<lib-login (submitted)="onLogin($event)"></lib-login>
 ```
