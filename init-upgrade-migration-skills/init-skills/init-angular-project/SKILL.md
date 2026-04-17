@@ -91,6 +91,7 @@ AI 應首選判斷專案結構，採取不同依賴策略。
 | :--- | :--- | :--- |
 | `NG8002: Can't bind to 'X' since it isn't a known property` | 組件選用錯誤或未導入 | 1. 檢查 `imports` 是否包含該組件。<br>2. 檢查屬性名是否拼錯（例如應為 `route` 而非 `path`）。<br>3. 若使用 `lib-settings-page`，**禁用** `[tabs]` 綁定，改用 DI Provider。 |
 | 樣式丟失 (Style missing) | `styles.scss` 未正確載入，或仍使用舊版 `@import` 入口 | 檢查 `src/styles.scss` 是否用 `@use '@cx-rd/ui-kit/[AUDITED_STYLE_MODULE_PATH]'` 載入正確模組。 |
+| Sidebar / App Shell 高度沒有吃滿 | root height baseline 不完整，導致下游 `height: 100%` 無法成立 | 1. 檢查 `html`, `body`, `app-root` 是否都有明確的 `height: 100%`。<br>2. 檢查 `src/app/app.component.scss` 是否有 `:host { display: block; height: 100%; }`。<br>3. 禁止用 `100vh` wrapper 當成初始化階段的補丁。 |
 | 找不到 `@cx-rd/ui-kit` | 套件未正確安裝，或本地 `file:` 路徑失效 | Published Package：先檢查套件是否已安裝且版本與 Angular 21 對齊。<br>External Local Package：再檢查 `package.json` 的 `file:` 路徑與必要時的 `preserveSymlinks: true`。 |
 
 ---
@@ -100,20 +101,29 @@ AI 應首選判斷專案結構，採取不同依賴策略。
 確認專案使用 `src/styles.scss`（若仍是 `src/styles.css` 才需要更名），並寫入以下內容：
 
 ```scss
+@use '@cx-rd/ui-kit/[AUDITED_STYLE_MODULE_PATH]';
+
 /* 全域重置 */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html,
 body,
 app-root {
-  min-height: 100%;
+  height: 100%;
+}
+
+body {
   margin: 0;
 }
 
-/* UI Kit v21 build-package 樣式入口 */
-@use '@cx-rd/ui-kit/[AUDITED_STYLE_MODULE_PATH]';
+app-root {
+  display: block;
+  min-height: 100%;
+}
 ```
 
 > [!IMPORTANT]
@@ -140,7 +150,7 @@ app-root {
 <router-outlet></router-outlet>
 ```
 
-**同時確保** `src/app/app.component.ts` 的 `imports` 陣列包含 `RouterOutlet`：
+**同時必須更新** `src/app/app.component.ts`，讓 `imports` 陣列包含 `RouterOutlet`，並保留 `styleUrl` 以承接 root host 高度基準：
 
 ```typescript
 import { Component } from '@angular/core';
@@ -150,9 +160,20 @@ import { RouterOutlet } from '@angular/router';
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet],
-  templateUrl: './app.component.html'
+  templateUrl: './app.component.html',
+  styleUrl: './app.component.scss'
 })
 export class AppComponent {}
+
+```
+
+**並且必須建立或更新** `src/app/app.component.scss`，內容至少包含：
+
+```scss
+:host {
+  display: block;
+  height: 100%;
+}
 ```
 
 > [!CAUTION]
@@ -178,8 +199,11 @@ export class AppComponent {}
 
 - [ ] `ng serve` 可以正常啟動（無編譯錯誤）。
 - [ ] `app.component.html` 只有 `<router-outlet>`。
+- [ ] `src/app/app.component.ts` 使用 `templateUrl` 與 `styleUrl`，且 `imports` 包含 `RouterOutlet`。
+- [ ] `src/app/app.component.scss` 存在，且 `:host` 具有 `display: block; height: 100%`。
 - [ ] `angular.json` 包含 UI Kit 的 `assets` 映射。
 - [ ] `src/styles.scss` 沒有自創顏色或主題，且已透過 `@use '@cx-rd/ui-kit/[AUDITED_STYLE_MODULE_PATH]'` 載入 v21 樣式入口。
+- [ ] `html`, `body`, `app-root` 具有明確高度基準，避免 app shell / sidebar 高度失效。
 - [ ] `src/index.html` 包含 Material Icons 連結。
 
 初始化完成後，可立即使用 `generate-unified-page` 或 `generate-app-orchestrator` Skill 開始生成業務頁面。
