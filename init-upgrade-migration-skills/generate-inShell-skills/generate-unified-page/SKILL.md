@@ -1,11 +1,19 @@
 ---
 name: generate-unified-page
-description: 產生一般標準應用頁，這些頁面應該渲染在既有 app shell 內容區內，並重用 `@cx-rd/ui-kit` 的共用 layout primitive，但不可重建全域 shell。適用於 dashboard、all-notifications、Settings 這類標準後台頁。
+description: 產生一般標準應用頁，這些頁面應該渲染在既有 app shell 內容區內，並重用 `@cx-rd/ui-kit` 的共用 layout primitive，但不可重建全域 shell。適用於 dashboard、CRUD 列表頁、搜尋 / 篩選頁、表單頁，以及只用自然語言描述「做一個畫面，裡面有按鈕、下拉選單、表格、panel、pagination」這類標準後台畫面；生成前仍必須先審計 UI-kit 是否已有可直接承接的 component / primitive。
 ---
 
 # Generate Unified Page Skill
 
 用於建立一般 in-shell 應用頁。
+
+若使用者沒有指定 skill，只是用自然語言描述一個標準後台畫面，例如：
+
+- 做一個有按鈕和下拉選單的畫面
+- 做一個帶 filter、table、pagination 的頁面
+- 重建一個搜尋與列表頁
+
+只要它本質上屬於標準 in-shell page，就應納入本 skill 的判定範圍，但仍必須先走 `UI-kit adopt-first`。
 
 ## 核心規則
 

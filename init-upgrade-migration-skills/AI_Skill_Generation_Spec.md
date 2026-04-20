@@ -4,6 +4,20 @@
 
 ---
 
+## 0. 適用範圍 (Applicability)
+
+本規格不只適用於初始化、遷移或升版任務，也適用於所有由開發者主動發起的 UI 生成請求。
+
+包含但不限於：
+
+- 建立或重建整個畫面 / 頁面 / route
+- 建立局部 page section、filter 區、toolbar 區或表單區塊
+- 建立單一 UI 元件或 control，例如 button、下拉選單、select list、dialog、datatable、pagination、panel、stepper
+
+只要任務會產生新的 UI 結構，就必須先遵守本文件的 `UI-kit adopt-first` 原則，而不是把它視為僅限初始化或遷移階段的規則。
+
+---
+
 ## 1. 核心設計原則 (Core Mantras)
 
 1. **Orchestrator is contract-aware, not feature-implementing.**

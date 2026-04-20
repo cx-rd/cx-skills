@@ -1,10 +1,13 @@
 ---
-description: 合約感知型調度者：負責分析需求、管理技能映射並記錄委派鏈的全局管理器。
+name: generate-app-orchestrator
+description: 當使用者要求在 Angular 應用中建立、重建或修改一個完整畫面、頁面或 route 時使用。即使需求只描述畫面包含按鈕、下拉選單、表單、dialog、table、pagination、panel 或 stepper 等 UI 控制，也必須先審計 `@cx-rd/ui-kit` 是否已有可直接承接的 component / template，再決定委派到對應 specialized skill 或 generic page flow。
 ---
 
 # Generate App Orchestrator Skill (V5.2 - Ownership Conscious)
 
 本 Skill 不參與具體功能開發，為 **Delegation-First** 架構的全局管理器。其核心任務是確保應用程式結構與 UI-kit 的 Ownership 分配完全對齊。
+
+若使用者的描述很寬，例如「做一個畫面」、「重建一個頁面」、「做一個有按鈕和下拉選單的後台畫面」，也應先由本 Skill 判定是否屬於完整 screen / page generation，再進行 UI-kit adopt-first 審計與後續委派。
 
 ## 1. 核心守則
 1. **Orchestrator is contract-aware, not feature-implementing.**
