@@ -33,6 +33,19 @@ description: 產生一般標準應用頁，這些頁面應該渲染在既有 app
 - 不可再建立第二層 toolbar 或 sidebar
 - 除非頁面本身確實需要，否則不要再引入競爭性的 scroll container
 
+## UI-kit Adopt-First
+
+在建立任何本地 HTML / SCSS 前，必須先審計 `@cx-rd/ui-kit` 的公開 exports 與 `.d.ts`。
+
+規則如下：
+
+- 若 UI-kit 已有可語義承接需求的 component / primitive，必須優先使用
+- 最多只允許建立 thin adapter layer 來橋接資料、事件或路由
+- 不得先自寫近似 UI，再用 CSS / wrapper 模仿 UI-kit
+- 只有在 UI-kit 沒有合適 export，或現有 extension point 明確不足時，才允許 custom composition
+
+這條規則同樣適用於未來新增的 form control、button、dialog、datatable、pagination、panel、stepper 等元件。
+
 ## 命名合約
 
 - sidebar 第一個 section 的 component 名稱固定為 `dashboard`
@@ -54,4 +67,6 @@ description: 產生一般標準應用頁，這些頁面應該渲染在既有 app
 - 標準頁重建了全域 shell
 - full-page UI-kit component 被當成普通頁 section 包裝
 - 頁面重複建立 app-shell navigation、toolbar 或 layout chrome
+- UI-kit 已有可 direct adopt 的 component / primitive，卻仍自建近似 UI
+- 以 app-local wrapper 或自寫 DOM 骨架模仿既有 UI-kit component
 - 使用 inline metadata

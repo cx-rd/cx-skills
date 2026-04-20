@@ -1,6 +1,6 @@
 ---
 name: verify-app-generation
-description: 驗證 Angular 應用頁面是否符合結構、routing、shell ownership 與 UI-kit contract。用於檢查檔案分離、delegation record、route/layout 正確性、`@cx-rd/ui-kit` 使用方式、scroll container ownership、shell height baseline，以及 UI-kit 頁面元件是否在錯誤 ownership 模式下被使用。
+description: 驗證 Angular 應用頁面是否符合結構、routing、shell ownership 與 UI-kit contract。用於檢查檔案分離、delegation record、route/layout 正確性、`@cx-rd/ui-kit` 使用方式、UI-kit adopt-first 規則、scroll container ownership、shell height baseline，以及 UI-kit 頁面元件是否在錯誤 ownership 模式下被使用。
 ---
 
 # Verify App Generation Skill
@@ -11,9 +11,10 @@ description: 驗證 Angular 應用頁面是否符合結構、routing、shell own
 
 1. 先跑 mechanical audit。
 2. 再讀 `delegation-record.ts`，確認 feature route 與 ownership 宣告。
-3. 驗 app-shell ownership 與 shell height baseline。
-4. 接著依 feature specialized contract 驗每一頁。
-5. 對 duplicated page chrome、錯誤 route placement 或錯誤 scroll ownership 直接 fail。
+3. 驗 UI-kit adopt-first 與 component 選型。
+4. 驗 app-shell ownership 與 shell height baseline。
+5. 接著依 feature specialized contract 驗每一頁。
+6. 對 duplicated page chrome、錯誤 route placement、忽略 UI-kit 既有 export 或錯誤 scroll ownership 直接 fail。
 
 ## Mechanical Audit
 
@@ -80,6 +81,22 @@ Verifier 不可只靠 UI-kit 元件名字硬編碼判定 ownership。
 - `Full-Page` feature 不可註冊在 `MainLayout` shell children 之下
 - `In-Shell` feature 不可在自己的 consumer component 中再渲染 `MainLayoutComponent`
 - `In-Shell` feature 若使用功能完整的 UI-kit page component，允許其保有內部 header / tabs / sidebar，但不可再重建第二層 app shell
+
+## UI-kit Adoption Audit
+
+Verifier 必須確認生成流程有遵守「先用 UI-kit，沒有才自建」。
+
+至少檢查：
+
+- 是否先審計 `@cx-rd/ui-kit` 公開 exports / `.d.ts`
+- 若 UI-kit 已有可承接需求的 export，是否直接採用該 component / template
+- 若最終採 custom UI，是否有明確說明為何 UI-kit 無法 direct adopt
+
+以下任一情況直接 fail：
+
+- UI-kit 已有可直接承接的 component / template，卻仍建立近似的 app-local UI
+- 以自寫 HTML / SCSS / wrapper 模仿 UI-kit 的主要 DOM 骨架或互動骨架
+- 未先審計 UI-kit API，就直接宣稱需要自建
 
 ### Login Contract Audit
 
@@ -156,6 +173,7 @@ Verifier 必須依母規格與 specialized skill 檢查命名。
 - route wiring 正確
 - shell ownership 沒有重複
 - shell height baseline 正確
+- UI-kit adopt-first 規則有被遵守
 - UI-kit 功能完整頁面元件的 ownership 使用方式正確
 - login 頁的 `submitted` contract 已正確接線
 - full-page UI-kit component 沒有被錯誤重包

@@ -61,6 +61,8 @@
 - **工作區隔離**: 嚴禁遞迴外部路徑。
 - **合約先行**: 優先建立 `navigation.config.ts`。
 - **庫審計優先**: 優先讀取 `.d.ts` 確認 API。
+- **UI-kit 採用優先**: 只要 `@cx-rd/ui-kit` 已公開匯出可語義承接需求的 component / template，必須優先 direct adopt，而不是先自建 HTML / SCSS 再做近似模仿。
+- **自建 fallback 需有正當理由**: 只有在 UI-kit 沒有對應 export、或現有 contract 明確無法承接需求時，才允許建立 app-local UI；且必須保留「為何不能 direct adopt」的明確說明。
 
 ## 6.1 全域命名合約 (Global Naming Contract)
 
@@ -77,6 +79,16 @@ Title Case 規則：
 - `-` 後的第一個字母必須大寫
 
 若某個 specialized skill 需要使用不同的 title 欄位名稱或不同的 component 名稱，必須在該 skill 內明確宣告。
+
+## 6.2 UI-kit Adoption Contract
+
+所有新生成任務都必須遵守以下採用合約：
+
+1. 先審計 `@cx-rd/ui-kit` 公開 exports 與 `.d.ts`。
+2. 先判斷是否已有可直接承接的 page component、layout primitive、form control 或 interaction primitive。
+3. 若已有合適 export，優先 direct adopt；最多只允許建立 thin adapter layer 來橋接資料、事件或 route。
+4. 不得以自寫 DOM、SCSS、wrapper 或近似互動來取代已存在的 UI-kit component。
+5. 若最終必須自建，必須是因為 UI-kit 無對應能力，或 extension point 不足以滿足當前 contract。
 
 ---
 *文件更新日期：2026-03-10 (V5.1 - Hard Gate)*
@@ -211,6 +223,12 @@ scroll ownership 必須以「誰是主要 scroll container」為準，而不是�
 - sticky 行為掛在錯誤 container
 - wrapper 破壞既有元件的 scroll 模型
 
+### D. UI-kit Adoption Violation
+
+- UI-kit 已有可承接的 export，卻仍自建近似 UI
+- 以 app-local component 模仿 UI-kit 的主要 DOM 骨架或互動骨架
+- 未先審計 UI-kit 公開 API，就直接宣告必須自建
+
 ---
 
 ## 10. Verifier 增補責任
@@ -238,6 +256,14 @@ Verifier 不只驗證結構，還必須驗證 ownership。
 - scroll 行為是否落在正確層級
 - sticky 區塊是否與 scroll container 一致
 
+### Step 4: UI-kit Adoption Audit
+
+檢查：
+
+- 是否先審計 UI-kit 公開 exports
+- 是否優先採用既有 UI-kit component / template
+- 若採 custom UI，是否有明確 gap justification
+
 ---
 
 ## 11. 本文件與 Specialized Skills 的分工
@@ -247,6 +273,7 @@ Verifier 不只驗證結構，還必須驗證 ownership。
 - ownership 原則
 - shell 原則
 - scroll 原則
+- UI-kit 採用原則
 - hard gate 類型
 - verifier 應驗證的抽象類型
 
@@ -271,6 +298,7 @@ Verifier 不只驗證結構，還必須驗證 ownership。
 1. 若該 component 同時帶有多個 page-level 結構特徵，例如 header、tabs、sidebar、sticky filter、page-level spacing，則預設視為 `full-page owner`。
 2. 若某頁已經位於 route shell 之下，則預設它是 standard in-shell page，除非 contract 明確要求它自己擁有完整頁面結構。
 3. 若某元件已定義 `overflow`、`sticky`、section navigation 或內部 scroll 區塊，則預設 scroll ownership 屬於該元件，不可由 consumer 任意覆蓋。
+4. 若 UI-kit 已公開匯出可語義承接需求的 component / template，預設必須 direct adopt；custom implementation 是 fallback，不是預設路徑。
 
 ### Practical Override Rule
 
@@ -291,6 +319,7 @@ Verifier 不只驗證結構，還必須驗證 ownership。
 - ownership 沒有衝突
 - scroll container 層級正確
 - full-page template 沒有被重複包裝
+- UI-kit 採用策略正確，沒有忽略可 direct adopt 的既有 export
 
 ---
 *增補日期：2026-03-11 (V5.2 - Ownership First Addendum)*
