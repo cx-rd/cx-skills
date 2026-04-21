@@ -36,6 +36,7 @@ description: 驗證 Angular 應用頁面是否符合結構、routing、shell own
 - `featureType`
 - `route`
 - `ownership`
+- `shellSurfaceOwner`
 - `generatingSkill`
 - `outputPath`
 - `verificationTarget`
@@ -90,11 +91,13 @@ Verifier 必須確認生成流程有遵守「先用 UI-kit，沒有才自建」�
 
 - 是否先審計 `@cx-rd/ui-kit` 公開 exports / `.d.ts`
 - 若 UI-kit 已有可承接需求的 export，是否直接採用該 component / template
+- 若 UI-kit 已 export route constant 或 shell action contract，route wiring 是否採用該 contract
 - 若最終採 custom UI，是否有明確說明為何 UI-kit 無法 direct adopt
 
 以下任一情況直接 fail：
 
 - UI-kit 已有可直接承接的 component / template，卻仍建立近似的 app-local UI
+- UI-kit 已 export route constant 或既有 shell contract，卻仍自行猜 route path 或 action destination
 - 以自寫 HTML / SCSS / wrapper 模仿 UI-kit 的主要 DOM 骨架或互動骨架
 - 未先審計 UI-kit API，就直接宣稱需要自建
 
@@ -125,6 +128,17 @@ Verifier 必須確認生成流程有遵守「先用 UI-kit，沒有才自建」�
 
 若 shell 高度基準不明確，或 child page 反向成為 shell 高度 owner，直接 fail。
 
+## Shell Surface Audit
+
+若 app 使用 `MainLayoutComponent` 或等效 UI-kit shell，必須驗證 shell surface 與 feature route bridge。
+
+- 若存在 settings feature，且 app 使用 UI-kit user menu，必須存在 `settings` action 到 settings route 的 bridge。
+- 若 UI-kit 已 export `SETTINGS_PAGE_ROUTE` 或等效 route contract，settings bridge 不可改指向其他自行命名 path。
+- 若存在 notifications feature，且 app 使用 UI-kit notification bell / popover，必須存在 `View All Notifications` 到 notifications route 的 bridge。
+- 若 UI-kit 已 export `ALL_NOTIFICATIONS_ROUTE` 或等效 route contract，notification bridge 不可改指向其他自行命名 path。
+- 若使用 DOM query、footer 文字比對、手動事件委派等非 contract 方式攔截 UI-kit popover 行為，直接 fail。
+- 若未經使用者明確要求，卻因為有 settings page 而自行新增 competing sidebar settings entry，應視為 shell surface ownership 漂移。
+
 ## Scroll Ownership Audit
 
 若 scroll 行為掛在錯誤 container，直接 fail。
@@ -143,6 +157,7 @@ Verifier 必須確認生成流程有遵守「先用 UI-kit，沒有才自建」�
 - 主要 scroll container 應屬於 notifications page 內部內容區
 - 不可由外層 shell wrapper 改寫其 sticky header / tabs / filter 行為
 - 若 notifications 捲動時造成整個 shell 異常位移，直接 fail
+- `View All Notifications` 的 bridge 應導向 notifications feature route，而非只關閉 popover 或停留在目前頁
 
 ### Settings Scroll Checks
 
@@ -151,6 +166,7 @@ Verifier 必須確認生成流程有遵守「先用 UI-kit，沒有才自建」�
 - section navigation 應驅動 settings content panel，而非整個 app shell
 - 不可在 consumer 端用 workaround wrapper 改寫 settings 內部 scroll container
 - 若 section click 導致 app shell 被推動而非 settings content panel 移動，直接 fail
+- 若 shell 存在 settings action，其 destination 應導向 settings feature route，而非其他臨時頁或 placeholder route
 
 ## Naming Contract Audit
 
@@ -173,6 +189,7 @@ Verifier 必須依母規格與 specialized skill 檢查命名。
 - route wiring 正確
 - shell ownership 沒有重複
 - shell height baseline 正確
+- shell surface 與 route bridge 正確
 - UI-kit adopt-first 規則有被遵守
 - UI-kit 功能完整頁面元件的 ownership 使用方式正確
 - login 頁的 `submitted` contract 已正確接線

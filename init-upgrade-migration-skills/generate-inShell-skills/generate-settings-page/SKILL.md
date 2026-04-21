@@ -45,13 +45,22 @@ consumer 端只負責設定與 route wiring。
 
 1. 從 `@cx-rd/ui-kit` 匯入 `SettingsPageComponent`。
 2. 透過 `multi: true` 提供 `SETTINGS_TABS` 與 `SETTINGS_SECTIONS`。
-3. 需要 deep link 時，使用像 `/settings/:tabId` 這樣的 route-driven tab state。
-4. 將 `title`、`activeTabId`，必要時 `activeSectionId` 傳給 `<lib-settings-page>`。
-5. `tabChange`、`sectionScroll`、`save` 只用來做 app state integration，不可重做整個 settings 內部布局。
-6. settings route 預設註冊在既有 app shell 之下，除非 orchestrator 合約另有要求。
-7. component 名稱固定為 `settings`，對應 Angular class 必須為 `SettingsComponent`。
-8. `title` 必須使用 Title Case。
-9. 即使目前沿用 UI-kit 內建 sections，也必須保留 `src/app/settings/sections/` 作為後續自訂 section 的明確掛點。
+3. 若 `@cx-rd/ui-kit` 已 export `SETTINGS_PAGE_ROUTE` 或等效 route contract，註冊 route、redirect 與 shell bridge 時必須優先使用該 contract，不可自行猜測 path。
+4. 需要 deep link 時，使用像 `/settings/:tabId` 這樣的 route-driven tab state。
+5. 將 `title`、`activeTabId`，必要時 `activeSectionId` 傳給 `<lib-settings-page>`。
+6. `tabChange`、`sectionScroll`、`save` 只用來做 app state integration，不可重做整個 settings 內部布局。
+7. settings route 預設註冊在既有 app shell 之下，除非 orchestrator 合約另有要求。
+8. component 名稱固定為 `settings`，對應 Angular class 必須為 `SettingsComponent`。
+9. `title` 必須使用 Title Case。
+10. 即使目前沿用 UI-kit 內建 sections，也必須保留 `src/app/settings/sections/` 作為後續自訂 section 的明確掛點。
+
+## Shell Entry Boundary
+
+本 skill 擁有 settings page 內容與 route contract，但不擁有 settings 入口應放在哪一個 shell surface。
+
+- settings 是 user popover、sidebar 或其他 shell surface 的入口配置，屬於 orchestrator / shell contract。
+- 本 skill 的責任是提供穩定的 settings destination，讓 shell bridge 可以安全導向。
+- 若 shell 已存在 settings action，本 skill 不可再自行新增第二個 competing settings 入口作為 workaround。
 
 ## Ownership Rules
 
@@ -76,6 +85,7 @@ UI-kit settings page 擁有 section 內容區的 scrolling 行為。
 ## Fail If
 
 - 缺少 `SETTINGS_TABS` 或 `SETTINGS_SECTIONS`
+- UI-kit 已 export settings route contract，卻仍硬寫另一個 path 或讓 agent 自行命名 route
 - consumer 在 `<lib-settings-page>` 外又包了一層 page header 或 card shell
 - consumer 重複建立 tabs 或 section navigation
 - scroll 行為掛在錯誤的 container 上
